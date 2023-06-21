@@ -1,43 +1,26 @@
 import time
 import discord
-from discord.ext import tasks
+from discord.ext import tasks, commands
 from config import token, file_acces  # Importation du token du bot
-from GestFichier import add_user, search_real_name
+from GestFichier import add_user, search_real_name, log, act_sem
+from Pronote import search_user_exist, add_pronote_id, if_pronote_ok, daily_check_pronote
 
 
-intents = discord.Intents.default()  # Preparation du bot.
+intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
 
-client = discord.Client(intents=intents)
-
-
-def log(msg):
-    with open(f'log_{act_sem()}.txt', 'a') as f:
-        f.write(f'\n{h()} - {msg}')
-        f.close()
+bot = commands.Bot(command_prefix='/', intents=intents)
 
 
-def act_sem():
-    import time
-    timestamp = time.time()
-    num_sem = time.strftime("%U", time.localtime(timestamp))
-    return int(num_sem)
-
-
-def h():
-    import time
-    timestamp = time.time()
-    t = time.gmtime(timestamp)
-    minutes = t.tm_yday * 24 * 60 + t.tm_hour * 60 + t.tm_min
-    day = time.strftime("%a", time.localtime(timestamp))
-    return "{}-{:02d}:{:02d}".format(day, (minutes % (24 * 60)) // 60, minutes % 60)
+def convert_to_phrase(tuples):
+    phrase = ' '.join([str(item) for item in tuples])
+    return phrase
 
 
 async def addrole(USER_ID,ROLE_ID):  # fonction des roles
     # Récupère le serveur
     SERVER_ID = 1114119568244359231
-    server = client.get_guild(int(SERVER_ID))
+    server = bot.get_guild(int(SERVER_ID))
     if server is None:
         log("Impossible de trouver le serveur avec l'ID spécifié.")
         return
@@ -62,7 +45,7 @@ async def addrole(USER_ID,ROLE_ID):  # fonction des roles
 async def supprole(USER_ID,ROLE_ID):
     # Récupère le serveur
     SERVER_ID = 1114119568244359231
-    server = client.get_guild(int(SERVER_ID))
+    server = bot.get_guild(int(SERVER_ID))
     if server is None:
         print("Impossible de trouver le serveur avec l'ID spécifié.")
         return
@@ -85,16 +68,16 @@ async def supprole(USER_ID,ROLE_ID):
 
 
 # print when the bot is running
-@client.event
+@bot.event
 async def on_ready():
     log("Bot lancé.")
     my_task.start()
 
 
-@client.event  # When a new member join the serveur
+@bot.event  # When a new member join the serveur
 async def on_member_join(member):
     log(f'{member.display_name} a rejoint le Discord')
-    welcome_channel = client.get_channel(1114639638116716597)
+    welcome_channel = bot.get_channel(1114639638116716597)
     ui_welcome = discord.Embed(title=f'Bienvenue {member.display_name} !', color=0x04ff00,
                                description='Bienvenue sur le serveur de NSI !')
     await welcome_channel.send(content=f"<@!{member.id}>", embed=ui_welcome)
@@ -106,56 +89,61 @@ async def on_member_join(member):
                       "__pour l'ajouter !")
 
 
-@client.event  # Lorsque un message est envoyer
-async def on_message(msg):
-    if msg.author == client.user:
+@bot.command(description='Répond pong !')
+async def ping(msg):
+    await msg.reply(f'pong - {bot.latency}')
+    return
+
+
+@bot.command(description='Répond TEST avec embed!')
+async def test(msg):
+    deco = discord.Embed(title='CECI EST UN TEST', color=0x32a852)
+    await msg.reply(embed=deco)
+    return
+
+
+@bot.command(description='Permet de savoir qui est qui !')
+async def tki(msg, arg):
+    resp = search_real_name(arg)
+    if resp == 0:
+        await msg.reply(f"__Aucun résultat__ pour {arg}. Réessaye avec le nom d'utilisateur exacte sans " +
+                               "#0000", delete_after=10)
+        return
+    else:
+        await msg.reply(f"Il s'agit de **{resp}**")
         return
 
-    if msg.content.lower() == 'ping':
-        await msg.channel.send('pong')
-        return
 
-    if msg.content.lower() == 'test':
-        deco = discord.Embed(title='CECI EST UN TEST', color=0x32a852)
-        await msg.channel.send(embed=deco)
-        return
-
-    if msg.content.startswith('!tki'):
-        name = msg.content[5:]
-        resp = search_real_name(name)
-        if resp == 0:
-            await msg.channel.send(f"__Aucun résultat__ pour {name}. Réessaye avec le nom d'utilisateur exacte sans " +
-                                   "#0000", delete_after=10)
-        else:
-            await msg.channel.send(f"Il s'agit de **{resp}**")
-
-    if msg.content.startswith('!dlcsv'):
+@bot.command(description='Permet de telecharger la liste des utilisateurs associé à leurs prénom')
+async def dlcsv(msg):
         if msg.channel.id == 1114479881858859070 or msg.channel.id == 1114480297745072220:
             try:
-                await msg.channel.send(file=discord.File(r'{}prenom.csv'.format(file_acces)))
+                await msg.reply(file=discord.File(r'{}prenom.csv'.format(file_acces)))
             except Exception as e:
                 log(f'Erreur !dlcsv -> {e}')
                 deco = discord.Embed(title='Erreur envoi du fichier', color=0xE74C3C)
-                await msg.channel.send(Embed=deco)
+                await msg.reply(Embed=deco)
         else:
-            await msg.channel.send('mauvais channel', delete_after=5)
+            await msg.reply('mauvais channel', delete_after=5)
 
-    if msg.content.startswith('!prenom'):
+
+@bot.command(description="Permet d'associé ton pseudo et ton prénom !")
+async def prenom(msg, arg):
         channelName = str(msg.channel)
         if channelName[0:14] == 'Direct Message':
             channel_info = 'https://discord.com/channels/1114119568244359231/1114639638116716597'
             deco = discord.Embed(title=f"Fait `!prenom` dans {channel_info} !", color=0xE74C3C)
-            await msg.channel.send(embed=deco)
+            await msg.reply(embed=deco)
             return
         elif search_real_name(msg.author.display_name) != 0:
             deco = discord.Embed(title=f"Ton prénom est déja connu {search_real_name(msg.author.display_name)}",
                                  color=0xE74C3C, description='contact les modérateurs si erreur !')
-            await msg.channel.send(embed=deco, delete_after=10)
+            await msg.reply(embed=deco, delete_after=10)
         else:
-            name = msg.content[8:]
+            name = arg
             log(f'{msg.author.display_name} est désormais connu sous : {name}')
             deco = discord.Embed(title="Les modérateurs néssiterons pas à ban si le nom est troll", color=0xE74C3C)
-            await msg.channel.send(content=f'Tu es désormais connu sous le prénom : **{name}** !', embed=deco)
+            await msg.reply(content=f'Tu es désormais connu sous le prénom : **{name}** !', embed=deco)
             add_user(msg.author.display_name, name)
             role_id = 1115021521040187412
             role_income = 1115020283502411786
@@ -177,51 +165,97 @@ async def on_message(msg):
             await user.add_roles(role)
             await user.add_roles(role_in)
 
-    # !setstatus G Mon jeux
-    if msg.content.startswith('!setstatus'):
-        if 1114161697498865765 in [y.id for y in msg.author.roles]:
-            if msg.content[11] == 'G':
-                await client.change_presence(activity=discord.Game(name=msg.content[13:]))
-            elif msg.content[11] == 'L':
-                await client.change_presence(
-                    activity=discord.Activity(type=discord.ActivityType.listening, name=msg.content[13:]))
-            elif msg.content[11] == 'W':
-                await client.change_presence(
-                    activity=discord.Activity(type=discord.ActivityType.watching, name=msg.content[13:]))
+
+@bot.command(description="Permet de changer l'activité en cours")
+async def setstatus(msg, type, *Activity):
+    if 1114161697498865765 in [y.id for y in msg.author.roles]:
+        Act = convert_to_phrase(Activity)
+        if type == 'G':
+            await bot.change_presence(activity=discord.Game(name=Act))
+        elif type == 'L':
+            await bot.change_presence(
+                activity=discord.Activity(type=discord.ActivityType.listening, name=Act))
+        elif type == 'W':
+            await bot.change_presence(
+                activity=discord.Activity(type=discord.ActivityType.watching, name=Act))
+        else:
+            deco = discord.Embed(title="Utilisez la commande comme : `!setstatus [G/L/W] [status]",
+                                 color=0xE74C3C, description='G=Joue a...\nL=Ecoute...\nW=Regarde...')
+            await msg.reply(Embed=deco)
+    else:
+        deco = discord.Embed(title="Vous n'avez pas l'autorisation de faire ceci", color=0xE74C3C)
+        await msg.reply(embed=deco)
+        log(f'{msg.author.display_name} a tente de changer l activite')
+
+
+@bot.command(description="Permet de télécharger les log par semaine")
+async def dllog(msg, semaine):
+    nb = semaine
+    if msg.channel.id == 1114479881858859070 or msg.channel.id == 1114480297745072220:
+        try:
+            int(nb)
+        except:
+            await msg.reply('envoyer int pour la semaine des log', delete_after=5)
+        try:
+            await msg.reply(file=discord.File(r'log_{}.txt'.format(nb)))
+        except Exception as e:
+            log(f'Erreur !dllog -> {e}')
+            deco = discord.Embed(title=f'Erreur envoi du fichier {e}', color=0xE74C3C)
+            await msg.reply(embed=deco)
+    else:
+        await msg.reply('mauvais channel', delete_after=5)
+
+
+@bot.command(description="Permet de connaitre la semaine actuel")
+async def sem(msg):
+    week = act_sem()
+    await msg.reply(f'Nous en sommes a la semaine {week} de l année')
+
+
+@bot.command(description="Permet de connaitre la semaine actuel")
+async def version(msg):
+    await msg.reply('- actuellement en version - **V0.4**')
+
+
+@bot.command(description="Permet de t'inscrire au notifications Discord pour Pronote")
+async def pronote_in(msg, id, pwd, etab):
+    channelName = str(msg.channel)
+    if channelName[0:14] == 'Direct Message':  # Si le message est en DM
+        if search_user_exist(msg.author.id):  # Check si client est pas deja dans db
+            if if_pronote_ok(id, pwd)[0]:  # Si identifiant MDP sont ok
+                log(f'{msg.author.display_name} a validé sa connexion a pronote')
+                test = add_pronote_id(msg.author.id, id, pwd, etab)
+                if test[0]:  # Ajoute l'utilisteur à la db
+                    log(f'{msg.author.display_name} est désormais inscrit au notifications Pronote')
+                    deco = discord.Embed(title=f"Vous etes désormais inscrit {msg.author.display_name} !",
+                                         color=0x32a852)
+                    await msg.reply(embed=deco)
+                else:
+                    log(f'{msg.author.display_name} a eu une erreur lors son inscription : {test[1]}')
+                    deco = discord.Embed(title=f"Une erreur est survenu. Revoyez la syntaxe ou contacter un modo.",
+                                         description=test[1], color=0xE74C3C)
+                    await msg.reply(embed=deco)
             else:
-                deco = discord.Embed(title="Utilisez la commande comme : `!setstatus [G/L/W] [status]",
-                                     color=0xE74C3C, description='G=Joue a...\nL=Ecoute...\nW=Regarde...')
-                await msg.channel.send(Embed=deco)
+                deco = discord.Embed(title="Vos identifiant / MdP ne fonctionne pas.", color=0xE74C3C)
+                await msg.reply(embed=deco)
         else:
-            deco = discord.Embed(title="Vous n'avez pas l'autorisation de faire ceci", color=0xE74C3C)
-            await msg.channel.send(embed=deco)
-            log(f'{msg.author.display_name} a tente de changer l activite')
+            deco = discord.Embed(title="Vous etes déjà inscrit", color=0xE74C3C)
+            await msg.reply(embed=deco)
+    else:
+        deco = discord.Embed(title="Pour plus de sécurité, envoyez vos identifiants en MP.", color=0xE74C3C)
+        await msg.reply(embed=deco)
 
-    if msg.content.startswith('!dllog'):
-        nb = msg.content[7:]
-        if msg.channel.id == 1114479881858859070 or msg.channel.id == 1114480297745072220:
-            try:
-                int(nb)
-            except:
-                await msg.channel.send('envoyer int pour la semaine des log', delete_after=5)
-            try:
-                await msg.channel.send(file=discord.File(r'log_{}.txt'.format(nb)))
-            except Exception as e:
-                log(f'Erreur !dllog -> {e}')
-                deco = discord.Embed(title=f'Erreur envoi du fichier {e}', color=0xE74C3C)
-                await msg.channel.send(embed=deco)
+
+@bot.command(description="Permet de t'inscrire au notifications Discord pour Pronote")
+async def pronote_check(msg, id):
+    if 1114161697498865765 in [y.id for y in msg.author.roles]:
+        if search_user_exist(id):
+            await msg.reply('Utilisateur introuvable !')
         else:
-            await msg.channel.send('mauvais channel', delete_after=5)
-
-    if msg.content.startswith('!sem'):
-        week = act_sem()
-        await msg.channel.send(f'Nous en sommes a la semaine {week} de l année')
-
-    if msg.content.startswith('!version'):
-        await msg.channel.send('- actuellement en version - **V0.3**')
+            await msg.reply('Utilisateur trouvé !')
 
 
-@client.event  # Action lors d'un ajout de réaction
+@bot.event  # Action lors d'un ajout de réaction
 async def on_raw_reaction_add(ctx):
     if ctx.message_id == 1114122040924979221 and str(ctx.emoji) == '😂':
         await addrole(ctx.member.id, 1114210444366856323)
@@ -233,7 +267,7 @@ async def on_raw_reaction_add(ctx):
         await addrole(ctx.member.id, 1115689277955776584)
 
 
-@client.event  # Action lorsqu'on retire une reaction
+@bot.event  # Action lorsqu'on retire une reaction
 async def on_raw_reaction_remove(ctx):
     if ctx.message_id == 1114122040924979221 and str(ctx.emoji) == '😂':
         await supprole(ctx.user_id, 1114210444366856323)
@@ -245,14 +279,39 @@ async def on_raw_reaction_remove(ctx):
         await supprole(ctx.user_id, 1115689277955776584)
 
 
-@tasks.loop(hours=1)
+@bot.event
+async def on_command_error(ctx, error):
+    await ctx.send(f"An error occured: {str(error)}")
+    log(error)
+
+
+@tasks.loop(hours=1)  # Lance des automatisation, s'éxecute toute les heures
 async def my_task():
+    import time
     temps = time.localtime()
-    if temps[3] == 18:
-        modo_channel = client.get_channel(1114480297745072220)
+    if temps[3] == 18:  # Si il est 18h, le bot envoie un msg
+        modo_channel = bot.get_channel(1114480297745072220)
         await modo_channel.send(content='Le bot fonctionne correctement!')
+
+        import csv, time
+        from config import file_acces
+        fichier = open(f'{file_acces}pronote.csv')
+        table = list(csv.DictReader(fichier))
+        for a in table:
+            key = a['key']
+            if a['etab'] == 'wal':
+                etab = 'https://0590221v.index-education.net/pronote/eleve.html'
+            elif a['etab'] == 'wat':
+                etab = 'https://0590222w.index-education.net/pronote/eleve.html'
+            else:
+                log(f'Erreur Etablissement non reconnu pour {a["discord_id"]}')
+            news = daily_check_pronote(a, key)
+            if news[0] == 0:
+                deco = discord.Embed(title=f"Notification pronote pour {news[2]}!", description=news[1], color=0xE74C3C)
+                user = bot.get_user(a['discord_id'])
+                await user.send(embed=deco)
     print('ok')
 
 
 # Launch the bot on the internets !
-client.run(token)
+bot.run(token)
