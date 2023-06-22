@@ -67,8 +67,7 @@ def if_pronote_ok(id,pwd):
         return False
 
 
-def daily_check_pronote(a, key):
-    etab = ''
+def daily_check_pronote(a, key, etab):
     import time
     t = time.gmtime(time.time())
     if t.tm_mon < 10:
@@ -83,20 +82,26 @@ def daily_check_pronote(a, key):
 
     if client.logged_in:
         nom_utilisateur = client.info.name  # get users name
-        periods = client.periods
+        periods = client.periods  # Check les nouvelles notes
         for period in periods:
-            for grade in period.grades:  # iterate over all the grades
+            for grade in period.grades:
                 if str(grade.date) == date:
                     news.append(f'__Nouvelle note__: {grade.grade}/{grade.out_of} en {grade.subject} *(Coeff {grade.coefficient})*')
 
-        infos = client.information_and_surveys()
+        infos = client.information_and_surveys()  # Checks les infos
         for info in infos:
             if info.start_date[0:9] == date:
                 if info.read:
                     news.append(f'*(déjà lu)*~~{info.title} par {info.author}~~')
                 else:
                     news.append(f'**Nouvelle Info:**{info.title} par {info.author}')
-        if len(news) == 0:
+
+        disc_s = client.discussions()  # Check les disscussions (no jugement sur l'ortho)
+        for disc in disc_s:
+            if str(disc.date) == date:
+                news.append(f'__Nouvelle disscussion__: {disc.subject} *par {disc.creator}*')
+
+        if len(news) == 0:  # S'il n'y a rien de nouveau : rien afficher
             return 0
         propre = ''
         for ele in news:
@@ -104,20 +109,3 @@ def daily_check_pronote(a, key):
         return 1, propre, nom_utilisateur
     else:
         return 0
-
-
-'''
-# Exemple d'utilisation
-# Générer une nouvelle clé
-cle = generer_cle()
-print("Clé de chiffrement:", cle)
-
-# Chiffrer un message
-message = "Mot de passe secret"
-message_chiffre = chiffrer(message, cle)
-print("Message chiffré:", message_chiffre)
-
-# Déchiffrer un message
-message_dechiffre = dechiffrer(message_chiffre, cle)
-print("Message déchiffré:", message_dechiffre)
-'''
