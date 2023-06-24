@@ -83,7 +83,7 @@ async def on_member_join(member):
     await member.send("Salut :wave: \nEncore bienvenue sur le serveur de la NSI 1e !\nJe t'invite à __choisir t'es " +
                       "rôles__ dans le channel https://discord.com/channels/1114119568244359231/1114503731321507881!" +
                       "\n**Pour accèder au reste du serveur Discord, tu dois imprérativement donner ton prénom**. " +
-                      "fais `!prenom [ton prénom]`__dans " +
+                      "fais `/prenom [ton prénom]`__dans " +
                       "https://discord.com/channels/1114119568244359231/1114639638116716597" +
                       "__pour l'ajouter !")
 
@@ -131,7 +131,7 @@ async def prenom(msg, arg):
     channelName = str(msg.channel)
     if channelName[0:14] == 'Direct Message':
         channel_info = 'https://discord.com/channels/1114119568244359231/1114639638116716597'
-        deco = discord.Embed(title=f"Fait `!prenom` dans {channel_info} !", color=0xE74C3C)
+        deco = discord.Embed(title=f"Fait `/prenom` dans {channel_info} !", color=0xE74C3C)
         await msg.reply(embed=deco)
         return
     elif search_real_name(msg.author.display_name) != 0:
@@ -212,9 +212,9 @@ async def sem(msg):
     await msg.reply(f'Nous en sommes a la semaine {week} de l année')
 
 
-@bot.command(description="Permet de connaitre la semaine actuel")
+@bot.command(description="Permet de connaitre la version actuel")
 async def version(msg):
-    await msg.reply('- actuellement en version - **V0.4b**')
+    await msg.reply('- actuellement en version - **V0.cb**')
 
 
 @bot.command(description="Permet de t'inscrire au notifications Discord pour Pronote")
@@ -276,18 +276,23 @@ async def helpbot_pronote(msg):
 
 @bot.command(description="Permet d'obtenir de l'aide !")
 async def helpbot_admin(msg):
-    deco = discord.Embed(title="Un peu d'aide ?", description=
-                    "- `/dlcsv` permet de télécharger le csv de l'ensemble des prenoms des utilisateurs inscrit" +
-                    "\n- `/dllog [N°DeLaSemaine]` afin de télécharger les logs d'une semaine précise" +
-                    "\n- `/sem` te permet de savoir le n° de la seamine en cours *(Attention: semaine de Dim<>Sam)*" +
-                    "\n- `/pronote_check [ID_Discord]` te permet de savoir si un utilisateur est inscrit aux" +
-                    "notifications pronote *(debug)*" +
-                    "\n- `/setstatus [W/L/G] [Activité...]` permet de mettre une activité au bot *(W = Regarde.../" +
-                    "L = Ecoute.../ G = Joue a...)*" +
-                    "\n- `/version` permet de connaitre la version actuelle du bot",
-                         color=0x256D1B)
-    await msg.reply(embed=deco)
-
+    if msg.channel.id == 1114479881858859070 or msg.channel.id == 1114480297745072220:
+        if 1114161697498865765 in [y.id for y in msg.author.roles]:
+            deco = discord.Embed(title="Un peu d'aide ?", description=
+                            "- `/dlcsv` permet de télécharger le csv de l'ensemble des prenoms des utilisateurs inscrit" +
+                            "\n- `/dllog [N°DeLaSemaine]` afin de télécharger les logs d'une semaine précise" +
+                            "\n- `/sem` te permet de savoir le n° de la seamine en cours *(Attention: semaine de Dim<>Sam)*" +
+                            "\n- `/pronote_check [ID_Discord]` te permet de savoir si un utilisateur est inscrit aux" +
+                            "notifications pronote *(debug)*" +
+                            "\n- `/setstatus [W/L/G] [Activité...]` permet de mettre une activité au bot *(W = Regarde.../" +
+                            "L = Ecoute.../ G = Joue a...)*" +
+                            "\n- `/version` permet de connaitre la version actuelle du bot",
+                                 color=0x256D1B)
+            await msg.reply(embed=deco)
+        else:
+            await msg.reply("Vous n'avez pas l'autorisation néccéssaire", delete_after=5)
+    else:
+        await msg.reply('mauvais channel', delete_after=5)
 
 @bot.event  # Action lors d'un ajout de réaction
 async def on_raw_reaction_add(ctx):
@@ -346,7 +351,8 @@ async def my_task():
                 deco = discord.Embed(title=f"Notification pronote pour {news[2]}!", description=news[1], color=0xE74C3C)
                 user = bot.get_user(a['discord_id'])
                 await user.send(embed=deco)
-    print('ok')
+        modo_channel = bot.get_channel(1114480297745072220)
+        await modo_channel.send(content='Notification Pronote Effectué!')
 
 
 # Launch the bot on the internets !

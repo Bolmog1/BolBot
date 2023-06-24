@@ -90,16 +90,19 @@ def daily_check_pronote(a, key, etab):
 
         infos = client.information_and_surveys()  # Checks les infos
         for info in infos:
-            if info.start_date[0:9] == date:
+            if str(info.start_date)[0:10] == date:
                 if info.read:
-                    news.append(f'*(déjà lu)*~~{info.title} par {info.author}~~')
+                    news.append(f'*(info déjà lu)*~~{info.title} par {info.author}~~ le {info.start_date}')
                 else:
                     news.append(f'**Nouvelle Info:**{info.title} par {info.author}')
 
         disc_s = client.discussions()  # Check les disscussions (no jugement sur l'ortho)
         for disc in disc_s:
-            if str(disc.date) == date:
-                news.append(f'__Nouvelle disscussion__: {disc.subject} *par {disc.creator}*')
+            if str(disc.date)[0:10] == date:
+                if disc.unread:
+                    news.append(f'__Nouvelle disscussion__: {disc.subject} *par {disc.creator}*')
+                else:
+                    news.append(f'*(disscussion déjà lu)*: {disc.subject} *par {disc.creator}*')
 
         if len(news) == 0:  # S'il n'y a rien de nouveau : rien afficher
             return 0
