@@ -8,3 +8,8 @@ Un fichier csv *pronote.py* est néccésaire a la sauvegarde des ID/MdP des util
 Vous pouvez récupere la semaine actuelle avec la fonction *act_sem* dans *GestConfig.py*
 
 Le programme néccésite la librairie **Discord**,**Discord.ext**,**cryptographie** ainsi que **pronotepy** *(et les librairies liée)*
+
+
+## Photo de profil
+
+![Profil Picture Bot](https://github.com/Bolmog1/BolBot/blob/main/Other/ProfilPictureBolBot.png?raw=true)
