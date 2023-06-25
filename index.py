@@ -214,7 +214,7 @@ async def sem(msg):
 
 @bot.command(description="Permet de connaitre la version actuel")
 async def version(msg):
-    await msg.reply('- actuellement en version - **V0.cb**')
+    await msg.reply('- actuellement en version - **V0.4d**')
 
 
 @bot.command(description="Permet de t'inscrire au notifications Discord pour Pronote")
@@ -327,32 +327,33 @@ async def on_command_error(ctx, error):
 
 @tasks.loop(hours=1)  # Lance des automatisation, s'éxecute toute les heures
 async def my_task():
+    etab = ''
+    import csv
     import time
-    temps = time.localtime()
-    if temps[3] == 18:  # Si il est 18h, le bot envoie un msg
-        modo_channel = bot.get_channel(1114480297745072220)
-        await modo_channel.send(content='Le bot fonctionne correctement!')
-        etab = ''
-        import csv
-        import time
-        from config import file_acces
-        fichier = open(f'{file_acces}pronote.csv')
-        table = list(csv.DictReader(fichier))
-        for a in table:
-            key = a['key']
-            if a['etab'] == 'wal':
-                etab = 'https://0590221v.index-education.net/pronote/eleve.html'
-            elif a['etab'] == 'wat':
-                etab = 'https://0590222w.index-education.net/pronote/eleve.html'
-            else:
-                log(f'Erreur Etablissement non reconnu pour {a["discord_id"]}')
-            news = daily_check_pronote(a, key, etab)
-            if news[0] == 0:
-                deco = discord.Embed(title=f"Notification pronote pour {news[2]}!", description=news[1], color=0xE74C3C)
-                user = bot.get_user(a['discord_id'])
-                await user.send(embed=deco)
-        modo_channel = bot.get_channel(1114480297745072220)
-        await modo_channel.send(content='Notification Pronote Effectué!')
+    from config import file_acces
+    fichier = open(f'{file_acces}pronote.csv')
+    table = list(csv.DictReader(fichier))
+    for a in table:
+        print(a)
+        key = a['user_key']
+        if a['etab'] == 'wal':
+            etab = 'https://0590221v.index-education.net/pronote/eleve.html'
+        elif a['etab'] == 'wat':
+            etab = 'https://0590222w.index-education.net/pronote/eleve.html'
+        else:
+            log(f'Erreur Etablissement non reconnu pour {a["discord_id"]}')
+        news = daily_check_pronote(a, key, etab)
+        print(news)
+        if news[0] == 2:
+            log(f'Error login pronote {news[1]}')
+        elif news[0] == 0:
+            pass
+        else:
+            deco = discord.Embed(title=f"Notification pronote pour {news[2]}!", description=news[1], color=0xE74C3C)
+            user = await bot.fetch_user(a['discord_id'])
+            await user.send(embed=deco)
+    modo_channel = bot.get_channel(1114480297745072220)
+    await modo_channel.send(content='Notification Pronote Effectué!')
 
 
 # Launch the bot on the internets !

@@ -2,12 +2,22 @@ from cryptography.fernet import Fernet
 import pronotepy  # autoslot, urllib3, soupsieve, pycryptodome, certifi, requests, beautifulsoup4, pronotepy
 
 
-def add_pronote_id(dis_id, pro_id, pro_pwd, etab):  # Ajoute un utilisateur au CSV
+def decode(string):
+    decode = string.decode('utf-8')
+    return decode
+
+
+def add_pronote_id(dis_id, pro_id_b, pro_pwd_b, etab):  # Ajoute un utilisateur au CSV
     if etab == 'wat' or etab == 'wal':
         import csv
         etab_new = etab.lower()
-        key = Fernet.generate_key()
-        dict = {'discord_id': dis_id, 'pronote_id': chiffrer(pro_id, key), 'pronote_pwd': chiffrer(pro_pwd, key),
+        key_b = Fernet.generate_key()
+        key = decode(key_b)
+        pro_id_c = chiffrer(pro_id_b, key_b)
+        pro_pwd_c = chiffrer(pro_pwd_b, key_b)
+        pro_id = decode(pro_id_c)
+        pro_pwd = decode(pro_pwd_c)
+        dict = {'discord_id': dis_id, 'pronote_id': pro_id, 'pronote_pwd': pro_pwd,
                 'user_key': key, 'etab': etab_new}
         field_names = ['discord_id', 'pronote_id', 'pronote_pwd', 'user_key', 'etab']
         try:
@@ -76,9 +86,12 @@ def daily_check_pronote(a, key, etab):
         month = t.tm_mon
     date = str(t.tm_year) + '-' + month + '-' + str(t.tm_mday)
     news = []
+    encode_key = key.encode('utf-8')
+    id_pronote = a['pronote_id'].encode('utf-8')
+    pwd_pronote = a['pronote_pwd'].encode('utf-8')
     client = pronotepy.Client(etab,
-                              username=dechiffrer(a['pronote_id'], key),
-                              password=dechiffrer(a['pronote_pwd'], key))
+                              username=dechiffrer(id_pronote, encode_key),
+                              password=dechiffrer(pwd_pronote, encode_key))
 
     if client.logged_in:
         nom_utilisateur = client.info.name  # get users name
@@ -105,10 +118,10 @@ def daily_check_pronote(a, key, etab):
                     news.append(f'*(disscussion déjà lu)*: {disc.subject} *par {disc.creator}*')
 
         if len(news) == 0:  # S'il n'y a rien de nouveau : rien afficher
-            return 0
+            return 0, 'place Older'
         propre = ''
         for ele in news:
             propre = propre + ele + '\n'
         return 1, propre, nom_utilisateur
     else:
-        return 0
+        return 2, a['discord_id']
