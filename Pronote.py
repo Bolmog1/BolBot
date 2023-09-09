@@ -1,5 +1,6 @@
 from cryptography.fernet import Fernet
 import pronotepy  # autoslot, urllib3, soupsieve, pycryptodome, certifi, requests, beautifulsoup4, pronotepy
+import sqlite3
 
 
 def decode(string):
@@ -7,6 +8,7 @@ def decode(string):
     return decode
 
 
+'''
 def add_pronote_id(dis_id, pro_id_b, pro_pwd_b, etab):  # Ajoute un utilisateur au CSV
     if etab == 'wat' or etab == 'wal':
         import csv
@@ -44,6 +46,56 @@ def search_user_exist(user):  # Recherche un utilisateur dans le CSV
             return False
     fichier.close()
     return True
+'''
+
+
+# Fonction pour ajouter un utilisateur à la table 'pronote'
+def add_pronote_id(dis_id, pro_id_b, pro_pwd_b, etab):
+    if etab == 'wat' or etab == 'wal':
+        key_b = Fernet.generate_key()
+        key = key_b.decode()
+        pro_id_c = chiffrer(pro_id_b, key_b)
+        pro_pwd_c = chiffrer(pro_pwd_b, key_b)
+        pro_id = pro_id_c.decode()
+        pro_pwd = pro_pwd_c.decode()
+        etab_new = etab.lower()
+
+        try:
+            connection = sqlite3.connect('database.db')
+            cursor = connection.cursor()
+
+            query = "INSERT INTO pronote (discord_id, pronote_id, pronote_pwd, user_key, etab) VALUES (?, ?, ?, ?, ?)"
+            cursor.execute(query, (dis_id, pro_id, pro_pwd, key, etab_new))
+
+            connection.commit()
+            connection.close()
+
+            return True, 'ok'
+        except sqlite3.Error as e:
+            return False, e  # Erreur
+    else:
+        return False, 'Erreur etablissement, revoyez la syntaxe de l etablissement [wal/wat]'
+
+
+# Fonction pour rechercher si un utilisateur existe dans la table 'pronote'
+def search_user_exist(user):
+    try:
+        connection = sqlite3.connect('database.db')
+        cursor = connection.cursor()
+
+        query = "SELECT discord_id FROM pronote WHERE discord_id = ?"
+        cursor.execute(query, (user,))
+        result = cursor.fetchone()
+
+        connection.close()
+
+        if result:
+            return False
+        else:
+            return True
+    except sqlite3.Error as e:
+        print("Erreur lors de la recherche de l'utilisateur :", e)
+        return False
 
 
 def generer_cle():
@@ -77,7 +129,7 @@ def if_pronote_ok(id,pwd):
         return False
 
 
-def daily_check_pronote(a, key, etab):
+def daily_check_pronote(a):
     import time
     t = time.gmtime(time.time())
     if t.tm_mon < 10:
@@ -86,9 +138,11 @@ def daily_check_pronote(a, key, etab):
         month = t.tm_mon
     date = str(t.tm_year) + '-' + month + '-' + str(t.tm_mday)
     news = []
-    encode_key = key.encode('utf-8')
-    id_pronote = a['pronote_id'].encode('utf-8')
-    pwd_pronote = a['pronote_pwd'].encode('utf-8')
+    etab = a[2]
+    encode_key = a[1]
+    id_pronote = bytes(a[4], 'utf-8')
+    pwd_pronote = bytes(a[3], 'utf-8')
+    print(dechiffrer(id_pronote, encode_key))
     client = pronotepy.Client(etab,
                               username=dechiffrer(id_pronote, encode_key),
                               password=dechiffrer(pwd_pronote, encode_key))
